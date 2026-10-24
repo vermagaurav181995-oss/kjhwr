@@ -1,162 +1,161 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Area, Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, LineChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
-import { getForecast, getMetrics } from "./api.js";
-
-const COLORS = { actual: "#0b3c5d", forecast: "#d9822b", band: "#2a9d8f" };
-const fmt = (n) => Math.round(n).toLocaleString("en-GB");
+import React, { useState, useEffect } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 export default function App() {
-  // Decisions are made in January, so delivery days run 2 Jan to 1 Feb.
   const [day, setDay] = useState("2026-01-15");
   const [cutoff, setCutoff] = useState("09:00");
-  const [forecast, setForecast] = useState(null);
-  const [metrics, setMetrics] = useState(null);
-  const [mock, setMock] = useState(false);
-  const [tab, setTab] = useState("hour");
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("profile");
+  const [forecastData, setForecastData] = useState(null);
+  const [monthlyMetrics, setMonthlyMetrics] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let live = true;
-    setLoading(true);
-    Promise.all([getForecast(day, cutoff), getMetrics(cutoff)]).then(([f, m]) => {
-      if (!live) return;
-      setForecast(f.data);
-      setMetrics(m.data);
-      setMock(f.mock || m.mock);
-      setLoading(false);
-    });
-    return () => { live = false; };
+    fetchTradingData();
   }, [day, cutoff]);
 
-  const p90 = metrics?.summary.p90 ?? 0;
-  const points = useMemo(
-    () =>
-      (forecast?.points ?? []).map((p) => ({
-        ...p,
-        band: [Math.max(0, p.forecast - p90), p.forecast + p90],
-      })),
-    [forecast, p90]
-  );
+  const fetchTradingData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/forecast?day=${day}&cutoff=${cutoff}`);
+      const json = await res.json();
+      setForecastData(json);
 
-  const dayStats = useMemo(() => {
-    if (!points.length) return null;
-    const avg = (k) => points.reduce((s, p) => s + p[k], 0) / points.length;
-    return { forecastAvg: avg("forecast"), actualAvg: avg("actual") };
-  }, [points]);
+      const mRes = await fetch(`/api/metrics?cutoff=${cutoff}`);
+      const mJson = await mRes.json();
+      setMonthlyMetrics(mJson);
+    } catch (e) {
+      console.error("API connection error:", e);
+    }
+    setLoading(false);
+  };
+
+  const metrics = forecastData?.metrics || {};
 
   return (
-    <div className="page">
-      <header className="top">
+    <div style={{ fontFamily: 'Public Sans, -apple-system, sans-serif', background: '#0f172a', minHeight: '100vh', color: '#f8fafc', padding: '24px' }}>
+      {/* Top Navigation Bar */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #1e293b', paddingBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1>Wind forecast desk</h1>
-          <p className="sub">
-            GB national wind generation: what the forecast said when you had to buy, and how far off it tends to be.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ background: '#3b82f6', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.05em' }}>ELEXON BMRS</span>
+            <h1 style={{ fontSize: '20px', fontWeight: '700', margin: 0, letterSpacing: '-0.02em' }}>UK Day-Ahead Wind Power Trading Desk</h1>
+          </div>
+          <p style={{ color: '#94a3b8', margin: '4px 0 0 0', fontSize: '13px' }}>Procurement & Renewable Forecast Quantified Error Evaluation (January 2026 Delivery)</p>
         </div>
-        <div className="controls">
-          <label>
-            Delivery day
-            <input type="date" value={day} min="2026-01-02" max="2026-02-01" onChange={(e) => e.target.value && setDay(e.target.value)} />
-          </label>
-          <label>
-            Decision time, day before (UK)
-            <input type="time" value={cutoff} onChange={(e) => e.target.value && setCutoff(e.target.value)} />
-          </label>
+
+        {/* Controls */}
+        <div style={{ display: 'flex', gap: '12px', background: '#1e293b', padding: '10px 16px', borderRadius: '10px', border: '1px solid #334155' }}>
+          <div>
+            <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>Delivery Day (D)</label>
+            <input type="date" value={day} min="2026-01-02" max="2026-02-01" onChange={e => setDay(e.target.value)} style={{ background: '#0f172a', color: '#fff', border: '1px solid #475569', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', outline: 'none' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>D-1 Decision Cutoff</label>
+            <select value={cutoff} onChange={e => setCutoff(e.target.value)} style={{ background: '#0f172a', color: '#fff', border: '1px solid #475569', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', outline: 'none' }}>
+              <option value="09:00">09:00 GMT (Morning Gate)</option>
+              <option value="12:00">12:00 GMT (Midday Update)</option>
+              <option value="16:00">16:00 GMT (Late Afternoon)</option>
+              <option value="22:00">22:00 GMT (Final D-1 Lock)</option>
+            </select>
+          </div>
         </div>
       </header>
 
-      {mock && (
-        <p className="notice" role="status">
-          Backend not reachable, showing sample data. Start the FastAPI server to see real Elexon figures.
-        </p>
-      )}
+      {/* KPI Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <MetricCard title="Mean Absolute Error (MAE)" value={`${metrics.mae ? metrics.mae.toFixed(1) : 0} MW`} badge="Accuracy" />
+        <MetricCard title="Root Mean Sq Error (RMSE)" value={`${metrics.rmse ? metrics.rmse.toFixed(1) : 0} MW`} badge="Volatility" />
+        <MetricCard title="Forecast Bias" value={`${metrics.bias ? metrics.bias.toFixed(1) : 0} MW`} badge={metrics.bias > 0 ? "Overforecast" : "Underforecast"} isPositive={metrics.bias <= 0} />
+        <MetricCard title="P50 Absolute Error" value={`${metrics.p50_abs_error ? metrics.p50_abs_error.toFixed(1) : 0} MW`} badge="Median Error" />
+        <MetricCard title="P90 Absolute Error" value={`${metrics.p90_abs_error ? metrics.p90_abs_error.toFixed(1) : 0} MW`} badge="Tail Risk" isAlert={true} />
+      </div>
 
-      <main aria-busy={loading}>
-        <section className="hero">
-          <div className="hero-head">
-            <h2>
-              Expected wind on {new Date(day + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
-            </h2>
-            {dayStats && (
-              <p className="hero-num">
-                <strong>{fmt(dayStats.forecastAvg)} MW</strong> average forecast
-                <span className="muted"> · outturn {fmt(dayStats.actualAvg)} MW</span>
-              </p>
-            )}
+      {/* Interactive Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <TabButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} label="📈 Half-Hourly Generation Profile (Actual vs Cutoff)" />
+        <TabButton active={activeTab === 'residuals'} onClick={() => setActiveTab('residuals')} label="📊 Forecast Error Residuals (MW)" />
+        <TabButton active={activeTab === 'summary'} onClick={() => setActiveTab('summary')} label="📋 Monthly Accuracy Trend" />
+      </div>
+
+      {/* Main Workspace Chart / Content Card */}
+      <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '24px', height: '480px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
+            <p>Querying Elexon BMRS streams for {day} at {cutoff} cutoff...</p>
           </div>
-          <div className="chart tall">
-            <ResponsiveContainer>
-              <ComposedChart data={points} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke="#dfe6ea" vertical={false} />
-                <XAxis dataKey="time" interval={5} tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={fmt} width={64} tick={{ fontSize: 12 }} label={{ value: "MW", angle: -90, position: "insideLeft", offset: 14, fontSize: 12 }} />
-                <Tooltip formatter={(v) => (Array.isArray(v) ? `${fmt(v[0])} to ${fmt(v[1])} MW` : `${fmt(v)} MW`)} />
-                <Legend />
-                <Area dataKey="band" name="Forecast ± typical high error (P90)" stroke="none" fill={COLORS.band} fillOpacity={0.18} />
-                <Line dataKey="forecast" name="Forecast at decision time" stroke={COLORS.forecast} strokeWidth={2.5} dot={false} />
-                <Line dataKey="actual" name="Actual" stroke={COLORS.actual} strokeWidth={2.5} dot={false} />
-              </ComposedChart>
+        ) : activeTab === 'profile' ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#f8fafc' }}>National Wind Generation & Decision Forecast ({day})</h3>
+              <span style={{ fontSize: '12px', color: '#38bdf8' }}>Resolution: 30-Minute Settlement Periods</span>
+            </div>
+            <ResponsiveContainer width="100%" height="86%">
+              <LineChart data={forecastData?.data || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="startTime" tickFormatter={t => t.slice(11, 16)} stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" unit=" MW" />
+                <Tooltip contentStyle={{ background: '#0f172a', borderColor: '#475569', borderRadius: '8px', color: '#fff' }} labelFormatter={t => `Settlement Time: ${t.replace('T', ' ')} UTC`} />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Line type="monotone" dataKey="actual" stroke="#38bdf8" strokeWidth={2.5} dot={false} name="Actual Wind Outturn (MW)" />
+                <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} strokeDasharray="4 4" dot={false} name={`Cutoff Forecast @ ${cutoff} (MW)`} />
+              </LineChart>
             </ResponsiveContainer>
-          </div>
-          <p className="note">
-            The shaded band shows the range that contains the actual outturn about 9 times in 10, based on all January forecasts at this decision time.
-          </p>
-        </section>
-
-        <section className="stats" aria-label="Forecast accuracy, January 2026">
-          <h2>How accurate was it?</h2>
-          {metrics && (
-            <dl>
-              <Stat label="Average miss (MAE)" value={`${fmt(metrics.summary.mae)} MW`} hint="Typical size of an error" />
-              <Stat label="RMSE" value={`${fmt(metrics.summary.rmse)} MW`} hint="Penalises large misses more" />
-              <Stat label="Bias" value={`${metrics.summary.bias > 0 ? "+" : ""}${fmt(metrics.summary.bias)} MW`} hint={metrics.summary.bias < 0 ? "Forecast runs low on average" : "Forecast runs high on average"} />
-              <Stat label="Error, 9 in 10 half-hours" value={`${fmt(metrics.summary.p90)} MW`} hint="Plan a buffer of this size" />
-              <Stat label="Error, 19 in 20 half-hours" value={`${fmt(metrics.summary.p95)} MW`} hint="For a more cautious buffer" />
-            </dl>
-          )}
-        </section>
-
-        <section className="breakdown">
-          <div className="tabs" role="tablist">
-            <button role="tab" aria-selected={tab === "hour"} onClick={() => setTab("hour")}>Error by time of day</button>
-            <button role="tab" aria-selected={tab === "horizon"} onClick={() => setTab("horizon")}>Error by forecast age</button>
-          </div>
-          <div className="chart">
-            <ResponsiveContainer>
-              {tab === "hour" ? (
-                <BarChart data={metrics?.byHour ?? []} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                  <CartesianGrid stroke="#dfe6ea" vertical={false} />
-                  <XAxis dataKey="hour" tickFormatter={(h) => `${String(h).padStart(2, "0")}:00`} interval={2} tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={fmt} width={64} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v) => `${fmt(v)} MW`} labelFormatter={(h) => `Target hour ${String(h).padStart(2, "0")}:00`} />
-                  <Bar dataKey="mae" name="Average miss" fill={COLORS.actual} radius={[2, 2, 0, 0]} />
-                </BarChart>
-              ) : (
-                <LineChart data={metrics?.byHorizon ?? []} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                  <CartesianGrid stroke="#dfe6ea" vertical={false} />
-                  <XAxis dataKey="horizon" tickFormatter={(h) => `${h}h`} tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={fmt} width={64} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v) => `${fmt(v)} MW`} labelFormatter={(h) => `Published ${h} hours before delivery`} />
-                  <Line dataKey="mae" name="Average miss" stroke={COLORS.actual} strokeWidth={2.5} dot />
-                </LineChart>
-              )}
+          </>
+        ) : activeTab === 'residuals' ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#f8fafc' }}>Forecast Error (Forecast minus Actual) per Settlement Period</h3>
+              <span style={{ fontSize: '12px', color: '#f43f5e' }}>Positive = Over-procurement risk | Negative = Shortfall risk</span>
+            </div>
+            <ResponsiveContainer width="100%" height="86%">
+              <BarChart data={forecastData?.data || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="startTime" tickFormatter={t => t.slice(11, 16)} stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" unit=" MW" />
+                <Tooltip contentStyle={{ background: '#0f172a', borderColor: '#475569', borderRadius: '8px', color: '#fff' }} />
+                <ReferenceLine y={0} stroke="#cbd5e1" />
+                <Bar dataKey="error" fill="#38bdf8" name="Error (Forecast - Actual)" />
+              </BarChart>
             </ResponsiveContainer>
-          </div>
-        </section>
-      </main>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: '#f8fafc' }}>Daily MAE Trend Across January 2026 ({cutoff} Cutoff)</h3>
+              <span style={{ fontSize: '12px', color: '#38bdf8' }}>Overall MAE: {monthlyMetrics?.summary?.mae?.toFixed(1) || 0} MW</span>
+            </div>
+            <ResponsiveContainer width="100%" height="86%">
+              <LineChart data={monthlyMetrics?.daily || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="day" tickFormatter={d => d.slice(8, 10)} stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" unit=" MW" />
+                <Tooltip contentStyle={{ background: '#0f172a', borderColor: '#475569', borderRadius: '8px', color: '#fff' }} />
+                <Line type="monotone" dataKey="mae" stroke="#10b981" strokeWidth={2} dot={true} name="Daily Mean Absolute Error (MW)" />
+              </LineChart>
+            </ResponsiveContainer>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-function Stat({ label, value, hint }) {
+function MetricCard({ title, value, badge, isPositive = true, isAlert = false }) {
   return (
-    <div className="stat">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-      <p>{hint}</p>
+    <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '16px', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{ fontSize: '11px', fontWeight: '600', color: '#94a3b8', textTransform: 'uppercase' }}>{title}</span>
+        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: isAlert ? '#7f1d1d' : '#0f766e', color: isAlert ? '#fca5a5' : '#5cc5b7' }}>{badge}</span>
+      </div>
+      <div style={{ fontSize: '22px', fontWeight: '700', color: '#f8fafc', letterSpacing: '-0.02em' }}>{value}</div>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, label }) {
+  return (
+    <button onClick={onClick} style={{ background: active ? '#3b82f6' : '#1e293b', color: active ? '#fff' : '#94a3b8', border: active ? '1px solid #3b82f6' : '1px solid #334155', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}>
+      {label}
+    </button>
   );
 }

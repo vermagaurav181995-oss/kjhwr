@@ -1,73 +1,75 @@
-from __future__ import annotations
-
-import os
-import re
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from app.core import compute_metrics, select_forecasts
+from app.store import store
+import pandas as pd
 
-from .core import compute_metrics, day_points
-from .store import FIRST_DAY, LAST_DAY, Store
+app = FastAPI(title="UK Wind Power Forecast Desk API", version="1.0.1")
 
-DEFAULT_CUTOFF = "09:00"
-CUTOFF_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-state: dict = {}
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    state["store"] = Store()
-    yield
-
-
-app = FastAPI(title="Wind forecast API", version="0.1.0", lifespan=lifespan)
-
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET"], allow_headers=["*"])
-
-
-def _cutoff(value: str) -> str:
-    if not CUTOFF_RE.match(value):
-        raise HTTPException(422, "cutoff must be HH:MM (24h, UK time)")
-    return value
-
-
-def _day(value: str) -> str:
-    if not DAY_RE.match(value):
-        raise HTTPException(422, "date must be YYYY-MM-DD")
-    return value
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
-
-
-@app.get("/api/meta")
-def meta():
-    return {"firstDay": FIRST_DAY, "lastDay": LAST_DAY, "defaultCutoff": DEFAULT_CUTOFF}
+  return {
+      "status": "healthy",
+      "actuals_count": len(store.actuals),
+      "forecasts_count": len(store.forecasts),
+  }
 
 
 @app.get("/api/forecast")
-def forecast(day: str = Query(...), cutoff: str = DEFAULT_CUTOFF):
-    day, cutoff = _day(day), _cutoff(cutoff)
-    if not (FIRST_DAY <= day <= LAST_DAY):
-        raise HTTPException(404, f"day must be between {FIRST_DAY} and {LAST_DAY}")
-    points = day_points(state["store"].selection(cutoff), day)
-    if not points:
-        raise HTTPException(404, f"No data for {day}")
-    return {"day": day, "cutoff": cutoff, "points": points}
+def get_forecast(day: str = "2026-01-15", cutoff: str = "09:00"):
+  try:
+    df = select_forecasts(store.actuals, store.forecasts, day, cutoff)
+    records = []
+    for _, row in df.iterrows():
+      records.append({
+          "startTime": row["startTime"].isoformat(),
+          "actual": float(row["actual"]),
+          "forecast": float(row["forecast"]),
+          "error": float(row["error"]),
+      })
+    metrics = compute_metrics(df)
+    return {"day": day, "cutoff": cutoff, "metrics": metrics, "data": records}
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/metrics")
-def metrics(cutoff: str = DEFAULT_CUTOFF, date_from: str | None = None, date_to: str | None = None):
-    cutoff = _cutoff(cutoff)
-    if date_from:
-        _day(date_from)
-    if date_to:
-        _day(date_to)
-    result = compute_metrics(state["store"].selection(cutoff), date_from, date_to)
-    return {"cutoff": cutoff, **result}
+def get_metrics_summary(
+    cutoff: str = "09:00",
+    date_from: str = "2026-01-02",
+    date_to: str = "2026-02-01",
+):
+  try:
+    all_days = pd.date_range(start=date_from, end=date_to, freq="D")
+    frames = []
+    for d in all_days:
+      day_str = d.strftime("%Y-%m-%d")
+      sub = select_forecasts(store.actuals, store.forecasts, day_str, cutoff)
+      if not sub.empty:
+        sub["day"] = day_str
+        frames.append(sub)
+
+    if not frames:
+      return {"summary": {}, "daily": []}
+
+    combined = pd.concat(frames, ignore_index=True)
+    overall_metrics = compute_metrics(combined)
+
+    daily_summary = []
+    for day_str, group in combined.groupby("day"):
+      m = compute_metrics(group)
+      m["day"] = day_str
+      daily_summary.append(m)
+
+    return {"summary": overall_metrics, "daily": daily_summary}
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
