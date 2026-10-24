@@ -1,51 +1,79 @@
-:root {
-  --paper: #f2f5f7;
-  --ink: #12202b;
-  --muted: #5b6b77;
-  --line: #d3dce1;
-  --navy: #0b3c5d;
-  --amber: #d9822b;
-  --focus: #1b6ca8;
-  color-scheme: light;
+* {
+  box-sizing: border-box;
 }
-* { box-sizing: border-box; }
+
 body {
   margin: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: "Public Sans", system-ui, sans-serif;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.5;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #05070B;
+  color: #F3F4F6;
+  -webkit-font-smoothing: antialiased;
 }
-.page { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
-h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.01em; }
-h2 { margin: 0; font-size: 1.15rem; }
-.sub { margin: 4px 0 0; color: var(--muted); max-width: 60ch; }
-.top { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: flex-end; padding-bottom: 24px; border-bottom: 2px solid var(--navy); }
-.controls { display: flex; flex-wrap: wrap; gap: 16px; }
-.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); font-weight: 500; }
-input { font: inherit; color: var(--ink); padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
-input:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-.notice { margin: 16px 0 0; padding: 10px 14px; background: #fff4e5; border-left: 4px solid var(--amber); font-size: 0.9rem; }
-.hero { margin-top: 32px; }
-.hero-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; }
-.hero h2 { font-size: 1.5rem; letter-spacing: -0.01em; }
-.hero-num { margin: 0; font-size: 1.05rem; }
-.hero-num strong { font-size: 1.5rem; color: var(--amber); }
-.muted { color: var(--muted); }
-.chart { height: 300px; margin-top: 16px; }
-.chart.tall { height: 400px; }
-.note { margin: 8px 0 0; color: var(--muted); font-size: 0.9rem; max-width: 70ch; }
-.stats { margin-top: 48px; }
-dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: 16px 0 0; border-top: 1px solid var(--line); }
-.stat { padding: 16px 16px 16px 0; border-bottom: 1px solid var(--line); }
-dt { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
-dd { margin: 2px 0 0; font-size: 1.6rem; font-weight: 700; color: var(--navy); }
-.stat p { margin: 2px 0 0; font-size: 0.85rem; color: var(--muted); }
-.breakdown { margin-top: 48px; }
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-.tabs button { font: inherit; font-weight: 500; padding: 10px 16px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--muted); cursor: pointer; }
-.tabs button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--navy); }
-main[aria-busy="true"] { opacity: 0.6; transition: opacity 0.15s; }
-@media (max-width: 600px) { .chart.tall { height: 300px; } .page { padding: 20px 16px 48px; } }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+code, pre, .mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom modern scrollbar for tables and cards */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0F17;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2937;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #05070B;
+  color: #F3F4F6;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, pre, .mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom modern scrollbar for tables and cards */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0F17;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2937;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}

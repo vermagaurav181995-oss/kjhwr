@@ -3,9 +3,9 @@ import pandas as pd
 
 
 def select_forecasts(actuals_df, forecasts_df, delivery_date, cutoff_time):
-  """Selects the latest wind power forecast published at or before cutoff_time
+  """For delivery day D and cutoff C, each target half-hour uses the forecast
 
-  on day D-1 for delivery day D (resolution: 30 minutes).
+  with the latest publishTime at or before C on day D-1 (UK local time).
   """
   d_day = pd.to_datetime(delivery_date).normalize()
   prev_day = d_day - pd.Timedelta(days=1)
@@ -14,7 +14,6 @@ def select_forecasts(actuals_df, forecasts_df, delivery_date, cutoff_time):
   if forecasts_df.empty or actuals_df.empty:
     return pd.DataFrame(columns=["startTime", "actual", "forecast", "error"])
 
-  # Ensure datetime columns
   fc = forecasts_df.copy()
   act = actuals_df.copy()
 
@@ -22,7 +21,7 @@ def select_forecasts(actuals_df, forecasts_df, delivery_date, cutoff_time):
   fc["publishTime"] = pd.to_datetime(fc["publishTime"])
   act["startTime"] = pd.to_datetime(act["startTime"])
 
-  # Filter forecasts published up to cutoff_dt targeting delivery day
+  # Rule: forecasts published at or before cutoff on D-1 targeting delivery day D
   f_sub = fc[
       (fc["publishTime"] <= cutoff_dt)
       & (fc["startTime"].dt.date == d_day.date())
@@ -31,7 +30,7 @@ def select_forecasts(actuals_df, forecasts_df, delivery_date, cutoff_time):
   if f_sub.empty:
     return pd.DataFrame(columns=["startTime", "actual", "forecast", "error"])
 
-  # Pick the latest publishTime for each startTime
+  # Pick the latest publishTime for each half-hourly target start time
   f_latest = (
       f_sub.sort_values("publishTime").groupby("startTime").last().reset_index()
   )
@@ -48,7 +47,7 @@ def select_forecasts(actuals_df, forecasts_df, delivery_date, cutoff_time):
   if merged.empty:
     return pd.DataFrame(columns=["startTime", "actual", "forecast", "error"])
 
-  # Error = Forecast - Actual (positive = overforecast)
+  # Error = Forecast - Actual (in MW)
   merged["error"] = merged["generation_forecast"] - merged["generation_actual"]
   return merged[[
       "startTime",
@@ -80,7 +79,7 @@ def compute_metrics(merged_df):
       "count": int(len(merged_df)),
       "mae": float(abs_err.mean()),
       "rmse": float(np.sqrt((err**2).mean())),
-      "bias": float(err.mean()),
+      "bias": float(err.mean()),  # positive = overforecast, negative = underforecast
       "p50_abs_error": float(abs_err.quantile(0.50)),
       "p90_abs_error": float(abs_err.quantile(0.90)),
   }
