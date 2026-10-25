@@ -4,31 +4,35 @@ An institutional-grade, full-stack analytics platform designed for UK wholesale 
 
 ---
 
-## 🏗️ Architecture & Project Structure
-
-The project is structured with a decoupled backend and frontend architecture:
+## 📁 Details of Files and Directories Present
 
 ```text
 kjhwr/
 ├── server/                   # Python FastAPI Backend
 │   ├── app/
 │   │   ├── __init__.py
-│   │   ├── core.py           # Cutoff selection & quantitative error metrics
-│   │   ├── store.py          # Data store caching & CSV loader
-│   │   └── main.py           # FastAPI REST endpoints
+│   │   ├── core.py           # Cutoff selection & quantitative error metrics (MAE, RMSE, Bias, Quantiles)
+│   │   ├── store.py          # Data store caching & CSV dataset loader
+│   │   └── main.py           # FastAPI REST endpoints (/api/health, /api/forecast, /api/metrics)
 │   ├── scripts/
-│   │   └── fetch_elexon.py   # Elexon BMRS API / synthetic data generator
+│   │   └── fetch_elexon.py   # Elexon BMRS API client & offline synthetic January 2026 generator
 │   ├── tests/
-│   │   └── test_core.py      # Pytest unit tests for forecast logic
-│   └── requirements.txt
+│   │   └── test_core.py      # Pytest unit tests for forecast selection & error logic
+│   └── requirements.txt      # Python dependencies (FastAPI, Uvicorn, Pandas, NumPy, Pytest)
 │
 └── ui/                       # React + Vite Frontend
     ├── src/
-    │   ├── components/       # Modular UI components (Header, MetricsGrid, Calculator, TabsNav)
-    │   ├── utils/            # API fetch utility wrapper
-    │   ├── App.jsx           # Main dashboard workspace
-    │   ├── main.jsx
-    │   └── index.css
-    ├── package.json
-    ├── vite.config.js
-    └── index.html
+    │   ├── components/
+    │   │   ├── Calculator.jsx  # CCGT thermal backup hedging financial exposure calculator
+    │   │   ├── Header.jsx      # Institutional header with live UTC clock & status pill
+    │   │   ├── Logo.jsx        # VoltaUK energy brand logo component
+    │   │   ├── MetricsGrid.jsx # High-density KPI cards for MAE, RMSE, Bias, P50, and P90 tail risk
+    │   │   └── TabsNav.jsx     # Workspace view selector tabs
+    │   ├── utils/
+    │   │   └── api.js          # Environment-aware API fetch wrapper
+    │   ├── App.jsx             # Main dashboard controller & visualization orchestrator
+    │   ├── main.jsx            # React root mount entry
+    │   └── index.css           # Global custom styles, scrollbars, and animations
+    ├── package.json            # Node dependencies (React, Recharts, Lucide-react)
+    ├── vite.config.js          # Vite build config with local proxy support
+    └── index.html              # HTML shell with Google Fonts (Inter & JetBrains Mono)
